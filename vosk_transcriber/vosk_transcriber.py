@@ -1,0 +1,168 @@
+import sounddevice as sd
+from vosk import Model, KaldiRecognizer
+import queue
+import json
+import wave
+import numpy as np
+import os
+from speaker.speaker import Speaker
+from translator.translator import Translator
+
+modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-small-pt-0.3"
+
+
+class VoskTranscriber:
+    """
+    Classe para transcrever áudio em texto usando o Vosk.
+    """
+
+    def __init__(
+        self,
+        model_path=modelpath,
+        translator: Translator = None,
+        speaker: Speaker = None,
+    ):
+        self.model_path = model_path
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Modelo Vosk não encontrado em {model_path}")
+        self.model = Model(model_path)
+        self.recognizer = KaldiRecognizer(self.model, 16000)
+        self.queue = queue.Queue()
+        self.translator = translator
+        self.speaker = speaker
+
+    def real_time_transcribe(self):
+
+        def callback(indata, frames, time, status):
+            self.queue.put(bytes(indata))
+
+        with sd.RawInputStream(
+            samplerate=16000,
+            blocksize=8000,
+            dtype="int16",
+            channels=1,
+            callback=callback,
+        ):
+            print("Fale algo...")
+            while True:
+                data = self.queue.get()
+                if self.recognizer.AcceptWaveform(data):
+                    # print(json.loads(self.recognizer.Result())["text"])
+                    (
+                        self.translator.add_to_translate(
+                            json.loads(self.recognizer.Result())["text"]
+                        )
+                        if self.translator
+                        else (
+                            self.speaker.add_to_speak(
+                                json.loads(self.recognizer.Result())["text"]
+                            )
+                            if self.speaker
+                            else None
+                        )
+                    )
+
+    def file_transcribe(self, file_path, speaker: Speaker = None):
+        self.wf = wave.open(file_path, "rb")
+        self.model = Model(modelpath)
+        self.reccognizer = KaldiRecognizer(self.model, self.wf.getframerate())
+
+        output = ["", ""]
+
+        def callback(outdata, frames, time, status):
+            data = self.wf.readframes(frames)
+            if len(data) == 0:
+                raise sd.CallbackStop()
+            # Converta os bytes para um array NumPy do tipo correto
+            audio_array = np.frombuffer(data, dtype="int16")
+            # Ajuste o shape para canais (mono ou estéreo)
+            audio_array = audio_array.reshape(-1, self.wf.getnchannels())
+            if self.translator is None and self.speaker is None:
+                outdata[: len(audio_array)] = audio_array
+            if self.reccognizer.AcceptWaveform(data):
+                # print(json.loads(rec.Result())["text"], flush=True)
+                result = json.loads(self.reccognizer.Result())["text"]
+                output[0] += result + " "
+                (
+                    self.translator.add_to_translate(result)
+                    if self.translator
+                    else speaker.add_to_speak(result) if speaker else None
+                )
+            else:
+                output[1] = json.loads(self.reccognizer.PartialResult())["partial"]
+                """if output[1] != "":
+                    os.system("cls" if os.name == "nt" else "clear")
+                    for partial in output:
+                        if partial != "":
+                            print(partial, flush=True, end=" ")"""
+
+        with sd.OutputStream(
+            samplerate=self.wf.getframerate(),
+            channels=self.wf.getnchannels(),
+            dtype="int16",
+            callback=callback,
+            blocksize=4000,
+        ):
+            print("Reproduzindo e transcrevendo...")
+            sd.sleep(int(self.wf.getnframes() / self.wf.getframerate() * 1000))
+        print(json.loads(self.reccognizer.FinalResult())["text"])
+
+
+def real_time_transcribe():
+    print("Transcrição em tempo real iniciando. Aguarde....")
+    model = Model(modelpath)
+    rec = KaldiRecognizer(model, 16000)
+    q = queue.Queue()
+
+    def callback(indata, frames, time, status):
+        q.put(bytes(indata))
+
+    with sd.RawInputStream(
+        samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=callback
+    ):
+        print("Fale algo...")
+        while True:
+            data = q.get()
+            if rec.AcceptWaveform(data):
+                print(json.loads(rec.Result())["text"])
+
+
+def file_transcribe(file_path, speaker: Speaker = None):
+    wf = wave.open(file_path, "rb")
+    model = Model(modelpath)
+    rec = KaldiRecognizer(model, wf.getframerate())
+
+    output = ["", ""]
+
+    def callback(outdata, frames, time, status):
+        data = wf.readframes(frames)
+        if len(data) == 0:
+            raise sd.CallbackStop()
+        # Converta os bytes para um array NumPy do tipo correto
+        audio_array = np.frombuffer(data, dtype="int16")
+        # Ajuste o shape para canais (mono ou estéreo)
+        audio_array = audio_array.reshape(-1, wf.getnchannels())
+        # outdata[: len(audio_array)] = audio_array
+        if rec.AcceptWaveform(data):
+            # print(json.loads(rec.Result())["text"], flush=True)
+            result = json.loads(rec.Result())["text"]
+            output[0] += result + " "
+            speaker.add_to_speak(result) if speaker else None
+        else:
+            output[1] = json.loads(rec.PartialResult())["partial"]
+            if output[1] != "":
+                os.system("cls" if os.name == "nt" else "clear")
+                for partial in output:
+                    if partial != "":
+                        print(partial, flush=True, end=" ")
+
+    with sd.OutputStream(
+        samplerate=wf.getframerate(),
+        channels=wf.getnchannels(),
+        dtype="int16",
+        callback=callback,
+        blocksize=4000,
+    ):
+        print("Reproduzindo e transcrevendo...")
+        sd.sleep(int(wf.getnframes() / wf.getframerate() * 1000))
+    print(json.loads(rec.FinalResult())["text"])
