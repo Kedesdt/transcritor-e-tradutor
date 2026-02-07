@@ -9,6 +9,9 @@ from speaker.speaker import Speaker
 from translator.translator import Translator
 
 modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-small-pt-0.3"
+modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1-pruned"
+# modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1-20220516_2113"
+# modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1"
 
 
 class VoskTranscriber:
@@ -21,6 +24,7 @@ class VoskTranscriber:
         model_path=modelpath,
         translator: Translator = None,
         speaker: Speaker = None,
+        callback=None,
     ):
         self.model_path = model_path
         if not os.path.exists(model_path):
@@ -30,6 +34,7 @@ class VoskTranscriber:
         self.queue = queue.Queue()
         self.translator = translator
         self.speaker = speaker
+        self.callback = callback
 
     def real_time_transcribe(self):
 
@@ -48,19 +53,101 @@ class VoskTranscriber:
                 data = self.queue.get()
                 if self.recognizer.AcceptWaveform(data):
                     # print(json.loads(self.recognizer.Result())["text"])
+                    result = json.loads(self.recognizer.Result())["text"]
                     (
-                        self.translator.add_to_translate(
-                            json.loads(self.recognizer.Result())["text"]
-                        )
+                        self.translator.add_to_translate(result)
                         if self.translator
                         else (
-                            self.speaker.add_to_speak(
-                                json.loads(self.recognizer.Result())["text"]
-                            )
-                            if self.speaker
-                            else None
+                            self.speaker.add_to_speak(result) if self.speaker else None
                         )
                     )
+                    if self.callback:
+                        self.callback(result)
+
+    def real_time_transcribe_partial(self, callback=None, device=None):
+
+        def callback_func(indata, frames, time, status):
+            self.queue.put(bytes(indata))
+
+        with sd.RawInputStream(
+            samplerate=16000,
+            blocksize=8000,
+            dtype="int16",
+            channels=1,
+            callback=callback_func,
+            device=device,
+        ):
+            index = 0
+
+            print("Fale algo...")
+            while True:
+                data = self.queue.get()
+                if self.recognizer.AcceptWaveform(data):
+                    # print(json.loads(self.recognizer.Result())["text"])
+                    result = json.loads(self.recognizer.Result())["text"]
+                    w = result.split()
+                    for word in w[index:]:
+                        if callback:
+                            callback(word)
+                        elif self.callback:
+                            self.callback(word)
+
+                    index = 0
+
+                else:
+                    partial = json.loads(self.recognizer.PartialResult())["partial"]
+                    if partial:
+                        w = partial.split()
+                        if index < len(w) - 2:
+
+                            for word in w[index : len(w) - 2]:
+                                if callback:
+                                    callback(word)
+                                elif self.callback:
+                                    self.callback(word)
+                            index = len(w) - 2
+
+    def real_time_transcribe_partial_2(self, callback=None, device=None):
+
+        def callback_func(indata, frames, time, status):
+            self.queue.put(bytes(indata))
+
+        with sd.RawInputStream(
+            samplerate=16000,
+            blocksize=8000,
+            dtype="int16",
+            channels=1,
+            callback=callback_func,
+            device=device,
+        ):
+            index = 0
+
+            print("Fale algo...")
+
+            text = ""
+            while True:
+                data = self.queue.get()
+                if self.recognizer.AcceptWaveform(data):
+                    # print(json.loads(self.recognizer.Result())["text"])
+                    result = json.loads(self.recognizer.Result())["text"]
+                    text = result
+                    index = 0
+
+                else:
+                    partial = json.loads(self.recognizer.PartialResult())["partial"]
+
+                    if partial:
+                        w = partial.split()
+                        if index < len(w) - 2:
+
+                            for word in w[index : len(w) - 2]:
+                                text += " " + word
+                            index = len(w) - 2
+
+                if callback:
+                    callback(text)
+                elif self.callback:
+                    self.callback(text)
 
     def file_transcribe(self, file_path, speaker: Speaker = None):
         self.wf = wave.open(file_path, "rb")
