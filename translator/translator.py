@@ -9,10 +9,11 @@ class Translator(threading.Thread):
     Herda de threading.Thread para permitir execução assíncrona.
     """
 
-    def __init__(self, speaker=None, src_lang="pt", dest_lang="en"):
+    def __init__(self, speaker=None, src_lang="pt", dest_lang="en", callback=None):
         super().__init__(daemon=True)  # Define a thread como daemon
         self.queue = queue.Queue()  # Fila para armazenar textos a serem traduzidos
         self.speaker = speaker
+        self.callback = callback
         # Inicia a thread
         self.src_lang = src_lang
         self.dest_lang = dest_lang
@@ -27,10 +28,12 @@ class Translator(threading.Thread):
         while True:
             text = self.queue.get()
             translated_text = self.translator.translate(text)
+            if self.callback:
+                self.callback(translated_text)
             self.speaker.add_to_speak(translated_text) if self.speaker else None
             print(f"\nTexto: {text} \nTexto traduzido: {translated_text}\n")
 
-    def add_to_translate(self, text):
+    def add_to_translate(self, text, callback=None):
         """
         Adiciona um texto à fila para ser traduzido.
 
@@ -38,3 +41,5 @@ class Translator(threading.Thread):
             text (str): O texto a ser adicionado à fila.
         """
         self.queue.put(text)
+        if callback:
+            self.callback = callback

@@ -1,3 +1,4 @@
+import json
 from translator.translator import Translator
 from vosk_transcriber.vosk_transcriber import VoskTranscriber
 from speaker.speaker import Speaker
@@ -37,16 +38,18 @@ def cc():
 def cc_to_file():
 
     ccs = ClosedCaptionSenderToFile(
-        file_path="legenda.txt",
+        file_path=config["file_path"],
         mode="w",
         upper=True,
         send_timestamp=False,
         limit=20 * 7,
     )
+    # translator = Translator(speaker=None, src_lang="pt", dest_lang="en")
     transcriber = VoskTranscriber(
         translator=None, speaker=None, callback=ccs.add_to_send
     )
     transcriber.real_time_transcribe_partial_2()
+    # transcriber.real_time_transcribe()
 
 
 def main():
@@ -68,6 +71,8 @@ def main():
     transcriber.real_time_transcribe()
 
 
+config = json.loads(open("config.json", "r", encoding="utf-8").read())
+print(config)
 if __name__ == "__main__":
     # cc()
     cc_to_file()

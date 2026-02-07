@@ -54,14 +54,17 @@ class VoskTranscriber:
                 if self.recognizer.AcceptWaveform(data):
                     # print(json.loads(self.recognizer.Result())["text"])
                     result = json.loads(self.recognizer.Result())["text"]
-                    (
-                        self.translator.add_to_translate(result)
-                        if self.translator
-                        else (
-                            self.speaker.add_to_speak(result) if self.speaker else None
+                    if self.translator:
+                        (
+                            self.translator.add_to_translate(result, self.callback)
+                            if self.translator
+                            else (
+                                self.speaker.add_to_speak(result)
+                                if self.speaker
+                                else None
+                            )
                         )
-                    )
-                    if self.callback:
+                    elif self.callback:
                         self.callback(result)
 
     def real_time_transcribe_partial(self, callback=None, device=None):

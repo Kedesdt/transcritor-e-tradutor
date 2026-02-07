@@ -1,3 +1,5 @@
 vosk-model*/
 venv/
 legenda.txt
+config.json
+__pycache__/
