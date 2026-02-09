@@ -8,8 +8,8 @@ import os
 from speaker.speaker import Speaker
 from translator.translator import Translator
 
-modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-small-pt-0.3"
-modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1-pruned"
+modelpath = "vosk-model-small-pt-0.3"
+modelpath = "vosk-model-pt-fb-v0.1.1-pruned"
 # modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1-20220516_2113"
 # modelpath = "C:\\Users\\kdtorres\\Documents\\Programacao\\transcritor_vosk\\vosk-model-pt-fb-v0.1.1"
 
